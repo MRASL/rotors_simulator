@@ -108,6 +108,18 @@ void LeePositionController::ComputeDesiredAcceleration(Eigen::Vector3d* accelera
   *acceleration = (position_error.cwiseProduct(controller_parameters_.position_gain_)
       + velocity_error.cwiseProduct(controller_parameters_.velocity_gain_)) / vehicle_parameters_.mass_
       - vehicle_parameters_.gravity_ * e_3 - command_trajectory_.acceleration_W;
+
+  // limit acceleration in x and y (together) to 2 m/s^2
+  if(acceleration->head(2).norm() > 2.0) {
+    acceleration->head(2) = acceleration->head(2).normalized() * 2.0;
+  }
+
+  // Clamp Z acceleration to +/- 2 m/s^2
+  if((*acceleration)(2) < -2.0 -vehicle_parameters_.gravity_){
+    (*acceleration)(2) = -2.0 - vehicle_parameters_.gravity_;
+  } else if((*acceleration)(2) > 2.0) {
+    (*acceleration)(2) = 2.0;
+  }
 }
 
 // Implementation from the T. Lee et al. paper
