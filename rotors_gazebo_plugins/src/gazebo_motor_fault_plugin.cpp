@@ -36,3 +36,72 @@
  ****************************************************************************/
 
 #include "rotors_gazebo_plugins/gazebo_motor_fault_plugin.hpp"
+
+namespace gazebo {
+
+void GazeboMotorFaultPlugin::Load(physics::ModelPtr _model, sdf::ElementPtr _sdf) {
+  this->model_ =_model;
+
+  //==============================================//
+  //========== READ IN PARAMS FROM SDF ===========//
+  //==============================================//
+
+  // Use the robot namespace to create the node handle.
+  if (_sdf->HasElement("robotNamespace"))
+    namespace_ = _sdf->GetElement("robotNamespace")->Get<std::string>();
+  else
+    gzerr << "[gazebo_motor_fault_plugin] Please specify a robotNamespace.\n";
+
+  std::string joint_name;
+  if (_sdf->HasElement("jointName"))
+    joint_name = _sdf->GetElement("jointName")->Get<std::string>();
+  else
+    gzerr << "[gazebo_motor_fault_plugin] Please specify a linkName.\n";
+  // Get the pointer to the link.
+  joint_ = model_->GetJoint(joint_name);
+  if (joint_ == NULL)
+  gzthrow("[gazebo_motor_fault_plugin] Couldn't find specified joint \"" << joint_name << "\".");
+
+  getSdfParam<std::string>(_sdf, "faultTopic", fault_topic_,
+                           kDefaultFaultTopic);
+
+  updateConnection_ = event::Events::ConnectWorldUpdateBegin(
+      boost::bind(&GazeboMotorFaultPlugin::OnUpdate, this, _1));
+
+  nh_ = new ros::NodeHandle();
+  sub_ = nh_->subscribe(namespace_ + "/" + fault_topic_, 1,
+                &GazeboMotorFaultPlugin::FaultCallback, this);
+
+  gzdbg << "\n\n\n\n\n\n\n\n" << "JESUS FUCKING CHRIST WILL THIS WORK ALREADY"
+        << namespace_ << "/" << fault_topic_ << "\n\n\n\n\n\n\n\n";
+}
+
+GazeboMotorFaultPlugin::~GazeboMotorFaultPlugin() {
+  event::Events::DisconnectWorldUpdateBegin(updateConnection_);
+  if(nh_) {
+    nh_->shutdown();
+    delete nh_;
+  }
+}
+
+void GazeboMotorFaultPlugin::OnUpdate(const common::UpdateInfo &) {
+  if(stop_) return;
+  //if(!pubs_and_subs_created_) CreatePubsAndSubs();
+  if(trigger_) {
+    joint_->Detach();
+    stop_ = true;
+  }
+}
+
+void GazeboMotorFaultPlugin::CreatePubsAndSubs() {
+
+  pubs_and_subs_created_ = true;
+}
+
+void GazeboMotorFaultPlugin::FaultCallback(std_msgs::Empty::ConstPtr msg) {
+  trigger_ = true;
+}
+
+GZ_REGISTER_MODEL_PLUGIN(GazeboMotorFaultPlugin);
+
+}

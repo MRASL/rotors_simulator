@@ -37,32 +37,67 @@
 #ifndef ROTORS_GAZEBO_PLUGINS_GAZEBO_MOTOR_FAULT_PLUGIN_HPP
 #define ROTORS_GAZEBO_PLUGINS_GAZEBO_MOTOR_FAULT_PLUGIN_HPP
 
+#include <ros/ros.h>
+#include <std_msgs/Empty.h>
+
 #include <gazebo/common/common.hh>
 #include <gazebo/common/Plugin.hh>
 #include <gazebo/gazebo.hh>
 #include <gazebo/physics/physics.hh>
 
+#include "rotors_gazebo_plugins/common.h"
+#include "ConnectGazeboToRosTopic.pb.h"
+
 namespace gazebo {
+
+static const std::string kDefaultFaultTopic = "motor_fault";
 
 class GazeboMotorFaultPlugin : public ModelPlugin {
 public:
   GazeboMotorFaultPlugin()
-      : ModelPlugin() {}
+      : ModelPlugin(),
+        pubs_and_subs_created_(false),
+        trigger_(false),
+        stop_(false),
+        nh_(0)
+  {}
 
   virtual ~GazeboMotorFaultPlugin();
-
-  virtual void InitializeParams();
-  virtual void Publish();
 
 protected:
   virtual void Load(physics::ModelPtr _model, sdf::ElementPtr _sdf);
   virtual void OnUpdate(const common::UpdateInfo &);
 
 private:
-
-  gazebo::transport::NodePtr node_handle_;
   physics::ModelPtr model_;
 
+  /// \brief    Transport namespace.
+  std::string namespace_;
+
+  /// \brief    Topic name for fault activation messages.
+  std::string fault_topic_;
+
+  /// \brief    Pointer to the joint.
+  physics::JointPtr joint_;
+
+  /// \brief    Pointer to the update event connection.
+  event::ConnectionPtr updateConnection_;
+
+  /// \brief    Flag that is set to true once CreatePubsAndSubs() is called, used
+  ///           to prevent CreatePubsAndSubs() from be called on every OnUpdate().
+  bool pubs_and_subs_created_;
+  bool trigger_;
+  bool stop_;
+
+  /// \brief    Creates all required publishers and subscribers, incl. routing of messages to/from ROS if required.
+  /// \details  Call this once the first time OnUpdate() is called (can't
+  ///           be called from Load() because there is no guarantee GazeboRosInterfacePlugin has
+  ///           has loaded and listening to ConnectGazeboToRosTopic and ConnectRosToGazeboTopic messages).
+  void CreatePubsAndSubs();
+
+  ros::NodeHandle* nh_;
+  ros::Subscriber sub_;
+  void FaultCallback(std_msgs::Empty::ConstPtr msg);
 };
 
 }
